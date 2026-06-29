@@ -150,7 +150,9 @@
   $$('.term').forEach(term => {
     const tip = document.createElement('span');
     tip.className = 'term-tooltip';
-    tip.textContent = term.dataset.definition;
+    // accept either data-definition (engine convention) or data-tip / title
+    // (commonly emitted by the generator) so the tooltip is never blank
+    tip.textContent = term.dataset.definition || term.dataset.tip || term.getAttribute('title') || '';
 
     term.addEventListener('mouseenter', () => showTooltip(term, tip));
     term.addEventListener('mouseleave', () => hideTooltip(tip));
