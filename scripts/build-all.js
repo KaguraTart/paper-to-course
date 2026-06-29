@@ -74,7 +74,38 @@ function buildHtml(courseDir) {
   base = base.replace(/COURSE_TITLE/g, title);
 
   // Assemble
-  const indexHtml = base + "\n" + moduleContents.join("\n") + "\n" + footer;
+  let indexHtml = base + "\n" + moduleContents.join("\n") + "\n" + footer;
+
+  // ── Inline CSS & JS → self-contained single file ──────────────
+  // The browser opens index.html directly (and it is often moved away from
+  // styles.css / main.js), so the external links must be inlined or the page
+  // renders with no styling and no interactivity. NOTE: use replacement
+  // *functions*, never replacement strings — a literal "$$"/"$&" inside
+  // styles.css or main.js would otherwise be mangled by String.replace.
+  const readAsset = name => {
+    for (const dir of [courseDir, resolve(SCRIPT_DIR, "../references")]) {
+      const fp = resolve(dir, name);
+      if (fs.existsSync(fp)) return fs.readFileSync(fp, "utf-8");
+    }
+    return null;
+  };
+  const css = readAsset("styles.css");
+  const js  = readAsset("main.js");
+
+  if (css) {
+    // drop the external stylesheet link, fill the INLINE_CSS placeholder
+    indexHtml = indexHtml.replace(/[ \t]*<link rel="stylesheet" href="styles\.css">\n?/i, "");
+    indexHtml = indexHtml.replace(/<!--\s*INLINE_CSS\s*-->/i, () => `<style>\n${css}\n</style>`);
+  }
+  if (js) {
+    // Remove the head <script src="main.js"> + INLINE_JS placeholder, then
+    // inject the script just before </body>. An inlined <script> ignores the
+    // `defer` attribute, so it must live at the end of <body> to guarantee the
+    // DOM exists when it runs.
+    indexHtml = indexHtml.replace(/[ \t]*<script src="main\.js"[^>]*><\/script>\n?/i, "");
+    indexHtml = indexHtml.replace(/<!--\s*INLINE_JS\s*-->\n?/i, "");
+    indexHtml = indexHtml.replace(/<\/body>/i, () => `<script>\n${js}\n</script>\n</body>`);
+  }
 
   const outPath = resolve(courseDir, "index.html");
   fs.writeFileSync(outPath, indexHtml, "utf-8");
